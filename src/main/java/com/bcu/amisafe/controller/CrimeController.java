@@ -3,6 +3,7 @@ package com.bcu.amisafe.controller;
 import com.bcu.amisafe.constants.Constants;
 import com.bcu.amisafe.entity.Crime;
 import com.bcu.amisafe.exception.ErrorResponse;
+import com.bcu.amisafe.service.CrimeCacheService;
 import com.bcu.amisafe.service.CrimeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,25 +19,20 @@ import java.util.List;
 public class CrimeController {
 
     private final CrimeService crimeService;
+    private final CrimeCacheService crimeCacheService;
 
     @PostMapping("/reload")
-    public ResponseEntity<String> reloadCrimeData(@RequestParam String latitude,
-                                                  @RequestParam String longitude,
-                                                  @RequestParam String date) {
-        crimeService.reloadCrimeData(latitude, longitude, date);
+    public ResponseEntity<String> reloadCrimeData() {
+        crimeCacheService.reloadCrimeData();
         return ResponseEntity.ok(Constants.CRIME_DATA_RELOAD_SUCCESS);
     }
 
     @GetMapping("/nearby")
-    public ResponseEntity<?> getCrimesByLatitudeAndLongitudeAndRadius(
-            @RequestParam String latitude,
-            @RequestParam String longitude,
-            @RequestParam String radius) {
+    public ResponseEntity<?> getCrimesByLocation(@RequestParam String latitude, @RequestParam String longitude, @RequestParam String radius) {
         List<Crime> crimes = crimeService.getCrimesByLatitudeAndLongitudeAndRadius(latitude, longitude, radius);
-        if (CollectionUtils.isEmpty(crimes)) {
-            ErrorResponse error = new ErrorResponse(Constants.ERROR, Constants.NO_CRIME_DATA);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        if (!CollectionUtils.isEmpty(crimes)) {
+            return ResponseEntity.ok(crimes);
         }
-        return ResponseEntity.ok(crimes);
+        return crimeService.reloadCrimeData(latitude, longitude) ? ResponseEntity.ok(crimeService.getCrimesByLatitudeAndLongitudeAndRadius(latitude, longitude, radius)) : ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(Constants.ERROR, Constants.NO_CRIME_DATA));
     }
 }

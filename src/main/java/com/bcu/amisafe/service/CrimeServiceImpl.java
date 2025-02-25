@@ -1,75 +1,56 @@
 package com.bcu.amisafe.service;
 
 import com.bcu.amisafe.entity.Crime;
+import com.bcu.amisafe.exception.ApiClientException;
+import com.bcu.amisafe.exception.ApiServerException;
 import com.bcu.amisafe.repository.CrimeRepository;
 import com.bcu.amisafe.utils.GeoUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CrimeServiceImpl implements CrimeService {
 
     private final CrimeRepository crimeRepository;
     private final CrimeCacheService crimeCacheService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestClient restClient;
 
-    @Value("${police.api.url}")
-    private String policeApiUrlTemplate;
+    @Value("${police.api.url.crime}")
+    private String policeApiCrimeURL;
 
-    /**
-     * Flushes old crime data and reloads fresh data from the police API.
-     *
-     * @param latitude  the latitude coordinate for the query
-     * @param longitude the longitude coordinate for the query
-     * @param date      the date (format: YYYY-MM) for the police data
-     */
-    @Transactional
-    @Override
-    public void reloadCrimeData(String latitude, String longitude, String date) {
-        // Fetch new crime data from the API first
-        List<Crime> crimesFromApi = fetchCrimesFromApi(latitude, longitude, date);
-        if (!CollectionUtils.isEmpty(crimesFromApi)) {
-            // Delete old records and save new ones
-            crimeRepository.deleteAll();
-            crimeRepository.saveAll(crimesFromApi);
-            log.info("Inserted {} new crime records.", crimesFromApi.size());
-        } else {
-            log.warn("No crime data fetched from the police API for coordinates: ({}, {})", latitude, longitude);
-        }
+    private static final Logger logger = LoggerFactory.getLogger(CrimeServiceImpl.class);
+
+    public CrimeServiceImpl(CrimeRepository crimeRepository, CrimeCacheService crimeCacheService,
+                            @Value("${police.api.url.crime}") String policeApiCrimeURL,
+                            RestClient restClient) {
+        this.crimeRepository = crimeRepository;
+        this.crimeCacheService = crimeCacheService;
+        this.policeApiCrimeURL = policeApiCrimeURL;
+        this.restClient = restClient;
     }
 
-    /**
-     * Retrieves crimes by latitude, longitude, and radius (in miles).
-     *
-     * @param latitude  User's latitude as a String
-     * @param longitude User's longitude as a String
-     * @param radius    Radius in miles as a String
-     * @return a list of Crime objects within the radius
-     */
     @Override
     public List<Crime> getCrimesByLatitudeAndLongitudeAndRadius(String latitude, String longitude, String radius) {
         final double userLat = Double.parseDouble(latitude);
         final double userLng = Double.parseDouble(longitude);
         final double radiusKm = Double.parseDouble(radius) * GeoUtils.MILES_TO_KILOMETERS;
-        // Attempt to get cached crimes; if not available, fetch from API
         List<Crime> crimes = fetchOrCacheCrimes(latitude, longitude);
         if (CollectionUtils.isEmpty(crimes)) {
             log.warn("No crime data available from both cache and API for coordinates: ({}, {})", latitude, longitude);
             return List.of();
         }
-        // Filter the crimes based on the Haversine formula
         return crimes.stream()
                 .filter(crime -> {
                     if (crime.getLocation() == null) {
@@ -83,14 +64,25 @@ public class CrimeServiceImpl implements CrimeService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Attempts to retrieve crimes from the database. If none exist, fetches from the API.
-     * Asynchronously updates the cache if data is found.
-     */
+    @Transactional
+    @Override
+    public boolean reloadCrimeData(String latitude, String longitude) {
+        List<Crime> crimesFromApi = fetchCrimesFromApi(latitude, longitude);
+        boolean isReloaded = false;
+        if (!CollectionUtils.isEmpty(crimesFromApi)) {
+            crimeRepository.saveAll(crimesFromApi);
+            isReloaded = true;
+            log.info("Inserted {} new crime records.", crimesFromApi.size());
+        } else {
+            log.warn("No crime data fetched from the police API for coordinates: ({}, {})", latitude, longitude);
+        }
+        return isReloaded;
+    }
+
     private List<Crime> fetchOrCacheCrimes(String latitude, String longitude) {
         List<Crime> crimes = crimeRepository.findByLocationLatitudeAndLocationLongitude(latitude, longitude);
         if (CollectionUtils.isEmpty(crimes)) {
-            crimes = fetchCrimesFromApi(latitude, longitude, "2024-01"); // Example date; adjust as needed
+            crimes = fetchCrimesFromApi(latitude, longitude);
         }
         if (!CollectionUtils.isEmpty(crimes)) {
             crimeCacheService.saveCrimesAsync(crimes);
@@ -98,12 +90,26 @@ public class CrimeServiceImpl implements CrimeService {
         return crimes;
     }
 
-    /**
-     * Fetches crime data from the police API based on latitude, longitude, and date.
-     */
-    private List<Crime> fetchCrimesFromApi(String latitude, String longitude, String date) {
-        String url = String.format(policeApiUrlTemplate, latitude, longitude, date);
-        Crime[] fetchedCrimes = restTemplate.getForObject(url, Crime[].class);
-        return Arrays.asList(Objects.requireNonNull(fetchedCrimes));
+    private List<Crime> fetchCrimesFromApi(String latitude, String longitude) {
+        String formattedUrl = String.format(policeApiCrimeURL, latitude, longitude);
+        logger.info("Fetching crimes from URL: {}", formattedUrl);
+        long startTime = System.currentTimeMillis();
+        List<Crime> crimes = restClient.get()
+                .uri(formattedUrl)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                    logger.error("Client error fetching crimes: {}", res.getStatusCode());
+                    throw new ApiClientException("Client error fetching crimes: " + res.getStatusCode());
+                })
+                .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                    logger.error("Server error fetching crimes: {}", res.getStatusCode());
+                    throw new ApiServerException("Server error fetching crimes: " + res.getStatusCode());
+                })
+                .body(new ParameterizedTypeReference<List<Crime>>() {
+                });
+        long endTime = System.currentTimeMillis();
+        logger.info("Fetched {} crimes in {} ms", crimes.size(), endTime - startTime);
+        return crimes;
     }
+
 }

@@ -4,9 +4,10 @@ import com.bcu.amisafe.dto.UserRequestDTO;
 import com.bcu.amisafe.dto.UserResponseDTO;
 import com.bcu.amisafe.entity.User;
 
+import java.util.Optional;
+
 public interface UserService {
     UserResponseDTO createUser(UserRequestDTO request);
-    User getUserById(String userId);
-    User updateUser(String userId, UserRequestDTO request);
-    void deleteUser(String userId);
+    Optional<User> getUserByEmail(String email);
+    UserResponseDTO updateUser(String email, UserRequestDTO request);
 }

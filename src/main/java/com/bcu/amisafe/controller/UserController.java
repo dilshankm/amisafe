@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -24,21 +26,22 @@ public class UserController {
          return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<User> getUser(@PathVariable String userId) {
-         User user = userService.getUserById(userId);
-         return ResponseEntity.ok(user);
+    @GetMapping("/{email}")
+    public ResponseEntity<User> getUser(@PathVariable String email) {
+        User user = userService.getUserByEmail(email).get();
+        return ResponseEntity.ok(user);
     }
 
-    @PutMapping("/{userId}")
-    public ResponseEntity<User> updateUser(@PathVariable String userId, @RequestBody UserRequestDTO request) {
-         User updatedUser = userService.updateUser(userId, request);
-         return ResponseEntity.ok(updatedUser);
+    @PatchMapping("/{email}")
+    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String email, @RequestBody UserRequestDTO request) {
+        UserResponseDTO response = userService.updateUser(email, request);
+        return ResponseEntity.ok().body(response);
     }
 
-    @DeleteMapping("/{userId}")
-    public ResponseEntity<String> deleteUser(@PathVariable String userId) {
-         userService.deleteUser(userId);
-         return ResponseEntity.ok("User deleted successfully");
+    @DeleteMapping("/{email}")
+    public ResponseEntity<UserResponseDTO> deleteUser(@PathVariable String email) {
+         userService.deleteUser(email);
+         return ResponseEntity.noContent().build();
     }
+
 }

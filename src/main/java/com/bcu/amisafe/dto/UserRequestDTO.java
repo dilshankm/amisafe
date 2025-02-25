@@ -1,5 +1,6 @@
 package com.bcu.amisafe.dto;
 
+import com.bcu.amisafe.entity.Location;
 import com.bcu.amisafe.entity.Preferences;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -14,5 +15,6 @@ public class UserRequestDTO {
     private String name;
     private String mobile;
     private LocalDate dob;
+    private Location currentLocation;
     private Preferences preferences;
 }
