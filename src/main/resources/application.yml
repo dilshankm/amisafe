@@ -13,14 +13,6 @@ police:
   api:
     url: "https://data.police.uk/api/crimes-street/all-crime?lat=%s&lng=%s&date=%s"
 
-  mvc:
-    cors:
-      mappings:
-        "/api/**":
-          allowed-origins: "*"
-          allowed-methods: "*"
-          allowed-headers: "*"
-
 logging:
   level:
     root: INFO
