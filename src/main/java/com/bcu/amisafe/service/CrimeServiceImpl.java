@@ -73,7 +73,7 @@ public class CrimeServiceImpl implements CrimeService {
         if (!CollectionUtils.isEmpty(crimesFromApi)) {
             crimeRepository.saveAll(crimesFromApi);
             isReloaded = true;
-            log.info("Inserted {} new crime records.", crimesFromApi.size());
+            log.info("Inserted {} new crime records", crimesFromApi.size());
         } else {
             log.warn("No crime data fetched from the police API for coordinates: ({}, {})", latitude, longitude);
         }
