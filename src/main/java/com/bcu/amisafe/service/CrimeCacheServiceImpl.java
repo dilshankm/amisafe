@@ -1,5 +1,6 @@
 package com.bcu.amisafe.service;
 
+import com.bcu.amisafe.constants.Constants;
 import com.bcu.amisafe.entity.Crime;
 import com.bcu.amisafe.entity.CrimeDataMetadata;
 import com.bcu.amisafe.exception.ApiClientException;
@@ -16,7 +17,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class CrimeCacheServiceImpl implements CrimeCacheService {
@@ -45,15 +46,17 @@ public class CrimeCacheServiceImpl implements CrimeCacheService {
                 .uri(policeApiLastUpdatedURL)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                    throw new ApiClientException("Client error fetching metadata: " + res.getStatusCode());
+                    throw new ApiClientException(Constants.CLIENT_ERROR_FETCHING_METADATA + res.getStatusCode());
                 })
                 .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
-                    throw new ApiServerException("Server error fetching metadata: " + res.getStatusCode());
+                    throw new ApiServerException(Constants.SERVER_ERROR_FETCHING_METADATA + res.getStatusCode());
                 })
                 .body(CrimeDataMetadata.class);
         CrimeDataMetadata dbMetadata = crimeDataMetadataRepository.findFirstByOrderByLastUpdatedDesc()
-                .orElseThrow(() -> new NoMetadataFoundException("No crime metadata found in the database"));
-        return Objects.equals(apiMetadata.getLastUpdated(), dbMetadata.getLastUpdated());
+                .orElseThrow(() -> new NoMetadataFoundException(Constants.NO_CRIME_METADATA_IN_DATABASE));
+        return Optional.ofNullable(apiMetadata)
+                .map(CrimeDataMetadata::getLastUpdated)
+                .equals(Optional.ofNullable(dbMetadata).map(CrimeDataMetadata::getLastUpdated));
     }
 
     @Async

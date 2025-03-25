@@ -11,4 +11,8 @@ public class Constants {
     public static final String USER_PROFILE_UPDATED_SUCCESSFULLY ="User profile updated successfully";
     public static final String USER_NOT_FOUND = "User not found";
     public static final String USER_DELETED_SUCCESSFULLY = "User deleted successfully";
+    public static final String CLIENT_ERROR_FETCHING_METADATA = "Client error fetching metadata";
+    public static final String SERVER_ERROR_FETCHING_METADATA = "Server error fetching metadata";
+    public static final String NO_CRIME_METADATA_IN_DATABASE = "No crime metadata found in the database";
+
 }

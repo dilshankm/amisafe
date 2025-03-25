@@ -17,6 +17,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -97,18 +98,18 @@ public class CrimeServiceImpl implements CrimeService {
         List<Crime> crimes = restClient.get()
                 .uri(formattedUrl)
                 .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
+                .onStatus(HttpStatusCode::is4xxClientError, (_, res) -> {
                     logger.error("Client error fetching crimes: {}", res.getStatusCode());
                     throw new ApiClientException("Client error fetching crimes: " + res.getStatusCode());
                 })
-                .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                .onStatus(HttpStatusCode::is5xxServerError, (_, res) -> {
                     logger.error("Server error fetching crimes: {}", res.getStatusCode());
                     throw new ApiServerException("Server error fetching crimes: " + res.getStatusCode());
                 })
-                .body(new ParameterizedTypeReference<List<Crime>>() {
+                .body(new ParameterizedTypeReference<>() {
                 });
         long endTime = System.currentTimeMillis();
-        logger.info("Fetched {} crimes in {} ms", crimes.size(), endTime - startTime);
+        logger.info("Fetched {} crimes in {} ms", Objects.requireNonNull(crimes).size(), endTime - startTime);
         return crimes;
     }
 

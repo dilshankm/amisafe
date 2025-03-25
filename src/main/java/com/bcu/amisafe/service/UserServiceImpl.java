@@ -8,8 +8,6 @@ import com.bcu.amisafe.exception.ResourceNotFoundException;
 import com.bcu.amisafe.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -20,18 +18,16 @@ public class UserServiceImpl implements UserService {
     }
 
     public UserResponseDTO createUser(UserRequestDTO request) {
-        userRepository.findByEmail(request.getEmail()).ifPresent(u -> {
-            throw new IllegalArgumentException(Constants.USER_ALREADY_EXISTS);
-        });
+        userRepository.findByEmail(request.getEmail())
+                .ifPresent(user -> { throw new IllegalArgumentException(Constants.USER_ALREADY_EXISTS); });
         User user = User.builder().email(request.getEmail()).name(request.getName()).mobile(request.getMobile()).dob(request.getDob()).currentLocation(request.getCurrentLocation()).preferences(request.getPreferences()).build();
         userRepository.save(user);
         return new UserResponseDTO(Constants.SUCCESS, Constants.USER_PROFILE_CREATED_SUCCESSFULLY, user.getEmail());
     }
 
-    public Optional<User> getUserByEmail(String email) {
-        Optional<User> user = userRepository.findByEmail(email);
-        user.orElseThrow(() -> new ResourceNotFoundException(Constants.USER_NOT_FOUND));
-        return user;
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(Constants.USER_NOT_FOUND));
     }
 
     public UserResponseDTO updateUser(String email, UserRequestDTO request) {
@@ -47,11 +43,11 @@ public class UserServiceImpl implements UserService {
         return new UserResponseDTO(Constants.SUCCESS, Constants.USER_PROFILE_UPDATED_SUCCESSFULLY, user.getEmail());
     }
 
-    public UserResponseDTO deleteUser(String email) {
+    public void deleteUser(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException(Constants.USER_NOT_FOUND));
         userRepository.deleteById(user.getId());
-        return new UserResponseDTO(Constants.SUCCESS, Constants.USER_DELETED_SUCCESSFULLY, email);
+        new UserResponseDTO(Constants.SUCCESS, Constants.USER_DELETED_SUCCESSFULLY, email);
     }
 
 }
