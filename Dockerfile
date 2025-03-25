@@ -5,11 +5,10 @@ FROM openjdk:23-jdk
 WORKDIR /app
 
 # Copy the packaged jar file into the container
-# (Assuming your Maven/Gradle build produces crime-alert-service.jar in the target folder)
-COPY target/crime-alert-service.jar /app/crime-alert-service.jar
+COPY target/amisafe-0.0.1-SNAPSHOT.jar /app/amisafe.jar
 
-# Expose the port your application listens on (e.g., 8080)
+# Expose the port your application listens on
 EXPOSE 8080
 
-# Define the command to run the application
-ENTRYPOINT ["java", "-jar", "crime-alert-service.jar"]
+# Run the app
+ENTRYPOINT ["java", "-jar", "amisafe.jar"]
